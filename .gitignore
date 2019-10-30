@@ -1,0 +1,10 @@
+# ignore all csv and sql files
+*.csv
+*.sql
+
+# ignore temporary vim files
+*~
+
+# ignore debug and general .tmp files
+*.dbg
+*.tmp
