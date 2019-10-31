@@ -199,7 +199,7 @@ sub print_WebDirFree_import {
       #"",                                              # contact_email   (EMPTY: Can't be empty)
       #"",                                              # expiration_date (EMPTY: Can't be empty)
       get_locations($business_id),                     # locations
-      $RailsDB{businesses}{$business_id}{address},     # address_1       (TODO: Parse into other fields)
+      get_address($business_id),                       # address_1       (TODO: Parse into other fields)
       "",                                              # zip             (TODO: Parse from other fields)
       get_phone_numbers($business_id),                 # phone           (TODO: Enable multiple phone numbers)
       #"",                                              # email           (EMPTY?)
@@ -315,16 +315,45 @@ sub get_locations {
   return $ret_location;
 }
 
+sub get_address {
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{businesses}{$business_id}{address};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  if($ret_string =~ /\\r\\n/) {
+    if($ret_string !~ /^".*"$/) {
+      # print "Had to do the double-quote diving save for business_id $business_id\n";
+      $ret_string = "\"".$ret_string."\"";
+    }
+  }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;
+}
+
 # Convert the Rails/SQL formatted description into something usable by WordPress
 sub get_description {
   # Start with the raw string from the rails sql file
   my $ret_string = $RailsDB{businesses}{$business_id}{description};
 
-  # Replace the Rails/SQL double newline (\r\n\r\n) with a single newline (\n\n)
-  $ret_string =~ s/\\r\\n\\r\\n/\n\n/g;
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If a description has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  if($ret_string =~ /\\r\\n/) {
+    if($ret_string !~ /^".*"$/) {
+      # print "Had to do the double-quote diving save for business_id $business_id\n";
+      $ret_string = "\"".$ret_string."\"";
+    }
+  }
 
-  # Simply remove the Rails more tag, include the preceeding newline (\r\n<!--more-->)
-  $ret_string =~ s/\\r\\n<!--more-->//g;
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a single newline (\n\n)
+  $ret_string =~ s/\\r\\n/\n/g;
+
+  # Remove the Rails more tag
+  $ret_string =~ s/<!--more-->//g;
 
   # TODO: Add more formatting conversions:
   #       => Bold -- Text surrounded by asterisks (*Some of the services on offer:*)
