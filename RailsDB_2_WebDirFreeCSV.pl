@@ -78,11 +78,11 @@ sub parse_table_rows {
   for (my $line=get_next_line($fh); $line ne '\.'; $line=get_next_line($fh)) {
     my @values = split(/\t/, $line);
     # Sanitize the data
-    #  If the value contains a comma(,) or double quote(") or Rails newline (\r\n)
+    #  If the value contains a comma(,) or double quote(")
     #  the entire value must be quoted after escaping the double quote(\")
     for (my $i=0; $i<=$#values; $i++) {
       my $modval = $values[$i];
-      if($modval =~ /[,"(\\r\\n)]/) {
+      if($modval =~ /[,"]/) {
         $modval =~ s/"/\\"/g;
         $values[$i] = "\"$modval\"";
       }
