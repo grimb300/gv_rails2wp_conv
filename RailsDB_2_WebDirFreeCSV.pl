@@ -78,11 +78,11 @@ sub parse_table_rows {
   for (my $line=get_next_line($fh); $line ne '\.'; $line=get_next_line($fh)) {
     my @values = split(/\t/, $line);
     # Sanitize the data
-    #  If the value contains a comma(,) or double quote(")
+    #  If the value contains a comma(,) or double quote(") or Rails newline (\r\n)
     #  the entire value must be quoted after escaping the double quote(\")
     for (my $i=0; $i<=$#values; $i++) {
       my $modval = $values[$i];
-      if($modval =~ /[,"]/) {
+      if($modval =~ /[,"(\\r\\n)]/) {
         $modval =~ s/"/\\"/g;
         $values[$i] = "\"$modval\"";
       }
@@ -122,9 +122,9 @@ sub store_table_in_RailsDB {
   my $id = 0;
   foreach $row (@$rows) {
     # Trying to debug a problem, only store the businesses entry for "Lila Thai Massage"
-    if(($name eq "businesses") and ($$row[3] ne "Lila Thai Massage")) {
-      next
-    }
+    # if(($name eq "businesses") and ($$row[3] ne "Lila Thai Massage")) {
+    #   next
+    # }
 
     # Populate the data structure (got the hash mapping from https://www.perlmonks.org/?node_id=4402)
     my %hashed_row;
@@ -315,9 +315,22 @@ sub get_locations {
   return $ret_location;
 }
 
+# Convert the Rails/SQL formatted description into something usable by WordPress
 sub get_description {
-  # Search and replace SQL newline (\r\n) for something understood by WebDirectoryFree (\n)
+  # Start with the raw string from the rails sql file
   my $ret_string = $RailsDB{businesses}{$business_id}{description};
-  # $ret_string =~ s/\\r\\n/\n/g;
+
+  # Replace the Rails/SQL double newline (\r\n\r\n) with a single newline (\n\n)
+  $ret_string =~ s/\\r\\n\\r\\n/\n\n/g;
+
+  # Simply remove the Rails more tag, include the preceeding newline (\r\n<!--more-->)
+  $ret_string =~ s/\\r\\n<!--more-->//g;
+
+  # TODO: Add more formatting conversions:
+  #       => Bold -- Text surrounded by asterisks (*Some of the services on offer:*)
+  #       => Unordered list -- Single newlines with space-asterisk for each item
+  #                            ( * Thai Massage\r\n * Foot Massage\r\n * Traditional Thai Herbal Body Scrub\r\n * Herbal Facial  Scrub\r\n * Pedicure & Manicure)
+
+  # Return the modified string
   return $ret_string;
 }
