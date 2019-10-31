@@ -148,7 +148,7 @@ sub print_WebDirFree_import {
 
   # CSV structure for Web Directory Free import file
   # Removing the following fields: contact_email, expiration_date, price, hours, summary, youtube, email
-  # Adding the following fields: latitude longitude
+  # Adding the following fields: latitude longitude alt_phone alt2_phone
   # Renaming: company_name to company_name_title
   #           address to address_1
   # my @WDF_header = qw(company_name level_ID contact_email
@@ -157,7 +157,7 @@ sub print_WebDirFree_import {
   #                     summary description youtube hours);
   my @WDF_header = qw(company_name_title level_ID
                       locations address_1
-                      zip phone web categories
+                      zip phone alt_phone alt2_phone web categories
                       description
                       latitude longitude);
 
@@ -184,6 +184,8 @@ sub print_WebDirFree_import {
   #  Listing contact    =>
   #  Make claimable     =>
   #  Phone              => phone
+  #  Alt Phone          => alt_phone
+  #  Alt2 Phone         => alt2_phone
   #  Website            => web
   #  Email              => email
 
@@ -201,7 +203,7 @@ sub print_WebDirFree_import {
       get_locations($business_id),                     # locations
       get_address($business_id),                       # address_1       (TODO: Parse into other fields)
       "",                                              # zip             (TODO: Parse from other fields)
-      get_phone_numbers($business_id),                 # phone           (TODO: Enable multiple phone numbers)
+      get_phone_numbers($business_id),                 # phone, alt_phone, alt2_phone (returns all three)
       #"",                                              # email           (EMPTY?)
       $RailsDB{businesses}{$business_id}{url},         # web
       #"",                                              # price           (EMPTY: Can remove)
@@ -256,14 +258,19 @@ sub get_phone_numbers {
     }
   }
 
-  # If there are multiple phone numbers associated with this business, make sure it has the correct separator (;)
-  # TODO: Only one phone number is currently supported, need to fix
-  # if(scalar(@ret_phone_numbers) > 1) {
-  #   return join(";", @ret_phone_numbers);
-  # } else {
-  #   return $ret_phone_numbers[0];
-  # }
-  return $ret_phone_numbers[0];
+  # The phone number field can't handle multiple phone numbers, so I added an alt/alt2_phone field
+  # This subroutine returns both fields, so if there is only one number then it returns a blank field
+  # The separator is a comma (,) as opposed to the semicolon used for other multiple value fields
+  # Start with a sanity check to make sure there aren't more than three numbers
+  if(scalar(@ret_phone_numbers) > 3) {
+    die "There are more than three phone numbers for business_id $business_id\n";
+  } elsif(scalar(@ret_phone_numbers == 3)) {
+    return join(",", @ret_phone_numbers);
+  } elsif(scalar(@ret_phone_numbers == 2)) {
+    return join(",", @ret_phone_numbers).",";
+  } else {
+    return $ret_phone_numbers[0].",,";
+  }
 }
 
 sub get_locations {

@@ -8,3 +8,4 @@
 # ignore debug and general .tmp files
 *.dbg
 *.tmp
+*.swp
