@@ -148,7 +148,7 @@ sub print_WebDirFree_import {
 
   # CSV structure for Web Directory Free import file
   # Removing the following fields: contact_email, expiration_date, price, hours, summary, youtube, email
-  # Adding the following fields: latitude longitude alt_phone alt2_phone
+  # Adding the following fields: latitude longitude alt_phone alt2_phone hours
   # Renaming: company_name to company_name_title
   #           address to address_1
   # my @WDF_header = qw(company_name level_ID contact_email
@@ -159,7 +159,7 @@ sub print_WebDirFree_import {
                       locations address_1
                       zip phone alt_phone alt2_phone web categories
                       description
-                      latitude longitude);
+                      latitude longitude hours);
 
   # Existing fields during the collate phase of the import (and the associated csv column)
   #  Title              => company_name_title (required)
@@ -188,6 +188,7 @@ sub print_WebDirFree_import {
   #  Alt2 Phone         => alt2_phone
   #  Website            => web
   #  Email              => email
+  #  Hours              => hours
 
 
   # Print the header
@@ -213,7 +214,8 @@ sub print_WebDirFree_import {
       #"",                                              # youtube         (EMPTY)
       #$RailsDB{businesses}{$business_id}{hours},       # hours          (TODO: Need to add to fields, I think)
       $RailsDB{businesses}{$business_id}{latitude},    # latitude
-      $RailsDB{businesses}{$business_id}{longitude}    # longitude
+      $RailsDB{businesses}{$business_id}{longitude},   # longitude
+      get_hours($business_id)                          # hours           (TODO: Will need formatting help)
     );
     print $WDFimport_fh join(",", @output_row)."\n";
   }
@@ -366,6 +368,20 @@ sub get_description {
   #       => Bold -- Text surrounded by asterisks (*Some of the services on offer:*)
   #       => Unordered list -- Single newlines with space-asterisk for each item
   #                            ( * Thai Massage\r\n * Foot Massage\r\n * Traditional Thai Herbal Body Scrub\r\n * Herbal Facial  Scrub\r\n * Pedicure & Manicure)
+
+  # Return the modified string
+  return $ret_string;
+}
+
+# This could be a tricky one since it has very specific formatting according to the import page:
+#   Opening hours content field import format: "Mon 01:00 AM - 12:30 PM", only 30 minutes range allowed.
+#   Days of week: Mon, Tue, Wed, Thu, Fri, Sat, Sun. Separate opening hours of each day of week by comma.
+#   Missing days of week will be set as "closed".
+#
+# It looks like blank is ok (nothing will show in the listing)
+sub get_hours {
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{businesses}{$business_id}{hours};
 
   # Return the modified string
   return $ret_string;
