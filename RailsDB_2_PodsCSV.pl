@@ -166,17 +166,28 @@ sub print_Pods_import {
   # Iterate across the entries in the "businesses" table and print them to the output csv
   foreach $business_id (keys(%{$RailsDB{businesses}})) {
     my @output_row = (
-      $RailsDB{businesses}{$business_id}{name},          # company_name
-      get_locations($business_id),                       # locations
-      get_address($business_id),                         # address
-      get_phone_numbers($business_id),                   # phone_1/2/3 (returns all three)
-      $RailsDB{businesses}{$business_id}{url},           # web
-      get_business_types($business_id),                  # categories
-      get_description($business_id),                     # description
-      $RailsDB{businesses}{$business_id}{latitude},      # latitude
-      $RailsDB{businesses}{$business_id}{longitude},     # longitude
-      get_hours($business_id),                           # hours
-      $RailsDB{businesses}{$business_id}{short_location} # short_location
+      get_field("businesses", $business_id, "name"),           # company_name
+      get_field("businesses", $business_id, "location"),       # locations
+      get_field("businesses", $business_id, "address"),        # address
+      get_field("businesses", $business_id, "phone_numbers"),  # phone_1/2/3 (returns all three)
+      get_field("businesses", $business_id, "url"),            # web
+      get_field("businesses", $business_id, "business_types"), # categories
+      get_field("businesses", $business_id, "description"),    # description
+      get_field("businesses", $business_id, "latitude"),       # latitude
+      get_field("businesses", $business_id, "longitude"),      # longitude
+      get_field("businesses", $business_id, "hours"),          # hours
+      get_field("businesses", $business_id, "short_location") # short_location
+      # $RailsDB{businesses}{$business_id}{name},          # company_name
+      # get_locations($business_id),                       # locations
+      # get_address($business_id),                         # address
+      # get_phone_numbers($business_id),                   # phone_1/2/3 (returns all three)
+      # $RailsDB{businesses}{$business_id}{url},           # web
+      # get_business_types($business_id),                  # categories
+      # get_description($business_id),                     # description
+      # $RailsDB{businesses}{$business_id}{latitude},      # latitude
+      # $RailsDB{businesses}{$business_id}{longitude},     # longitude
+      # get_hours($business_id),                           # hours
+      # $RailsDB{businesses}{$business_id}{short_location} # short_location
     );
     print $PODS_businesses_fh join(",", @output_row)."\n";
   }
@@ -191,50 +202,171 @@ sub print_Pods_import {
                                 other_ways_to_help contact_info);
 
   # Print the volunteer opportunities header
-  print $PODS_vol_opps_fh join(",", @Pods_vol_opps_header)."\n";
+  #print $PODS_vol_opps_fh join(",", @Pods_vol_opps_header)."\n";
 
   # Iterate across the entries in the "volunteer_opportunities" table and print them to the output csv
-  foreach $vol_opp_id (keys(%{$RailsDB{volunteer_opportunities}})) {
-    my @output_row = (
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{name},             # vol_opp_name
-      get_locations($vol_opp_id),                                       # locations
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{short_location},   # short_location
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{organization_url}, # organization_url
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{volunteer_url},    # volunteer_url
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{facebook_url},     # facebook_url
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{twitter_username}, # twitter_username
-      get_volunteer_types($vol_opp_id),                                 # volunteer_types
-      get_description($vol_opp_id),                                     # description
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{min_duration},     # min_duration
-      $RailsDB{volunteer_opportunities}{$vol_opp_id}{max_duration},     # max_duration
-      get_duration_notes($vol_opp_id),                                  # duration_notes
-      get_fee_category($vol_opp_id),                                    # fee_category
-      get_fee_notes($vol_opp_id),                                       # fee_notes
-      get_other_ways_to_help($vol_opp_id),                              # other_ways_to_help
-      get_contact_info($vol_opp_id)                                     # contact_info
-    );
-    print $PODS_vol_opps_fh join(",", @output_row)."\n";
-  }
+  # foreach $vol_opp_id (keys(%{$RailsDB{volunteer_opportunities}})) {
+  #   my @output_row = (
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{name},             # vol_opp_name
+  #     get_locations($vol_opp_id),                                       # locations
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{short_location},   # short_location
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{organization_url}, # organization_url
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{volunteer_url},    # volunteer_url
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{facebook_url},     # facebook_url
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{twitter_username}, # twitter_username
+  #     get_volunteer_types($vol_opp_id),                                 # volunteer_types
+  #     get_description($vol_opp_id),                                     # description
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{min_duration},     # min_duration
+  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{max_duration},     # max_duration
+  #     get_duration_notes($vol_opp_id),                                  # duration_notes
+  #     get_fee_category($vol_opp_id),                                    # fee_category
+  #     get_fee_notes($vol_opp_id),                                       # fee_notes
+  #     get_other_ways_to_help($vol_opp_id),                              # other_ways_to_help
+  #     get_contact_info($vol_opp_id)                                     # contact_info
+  #   );
+  #   print $PODS_vol_opps_fh join(",", @output_row)."\n";
+  # }
 
   # Close the csv files
   close($PODS_businesses_fh);
   close($PODS_vol_opps_fh);
 }
 
-sub get_business_types {
-  my $business_id = pop;
-  my @ret_types;
-  # Iterate over the business_types_businesses table and associate a business with its business_type(s)
-  foreach $table_id (keys(%{$RailsDB{business_types_businesses}})) {
-    if($RailsDB{business_types_businesses}{$table_id}{business_id} == $business_id) {
-      my $business = $RailsDB{businesses}{$business_id}{name};
-      my $business_type_id = $RailsDB{business_types_businesses}{$table_id}{business_type_id};
-      my $business_type = $RailsDB{business_types}{$business_type_id}{name};
-      # print "In business_types_businesses{$table_id} found business{$business_id} ($business) matching business_types{$business_type_id} ($business_type)\n";
-      push @ret_types, ($business_type);
+###############################################
+# Making the getter functions much more generic
+###############################################
+
+# get_record(<table>, <record_id>)
+#   table:     name of table (ex: businesses, volunteer_opportunities)
+#   record_id: record id within <table>
+sub get_record {
+  my ($table, $record_id) = @_;
+  return \%{$RailsDB{$table}{$record_id}};
+}
+
+# get_field(<table>, <record_id>, <field>)
+#   table:     name of table (ex: businesses, volunteer_opportunities)
+#   record_id: record id within <table>
+#   field:     field within <record_id>
+#
+sub get_field {
+  my ($table, $record_id, $field) = @_;
+
+  ###############
+  # Special cases
+  ###############
+
+  # The "location" field requires parsing the locationships table
+  # to find which records in the locations table to use to build the full location
+  if ($field eq "location") {
+    # The locationships table keys off of an id and locatable type ("Business" or "VolunteerOpportunity")
+    my $locatable_type = ($table eq "businesses")              ? "Business" :
+                         ($table eq "volunteer_opportunities") ? "VolunteerOpportunity" :
+                         die "Table \"$table\" is not defined for field \"location\"\n";
+    # print "Calling build_location($locatable_type, $record_id)\n";
+    return build_location($locatable_type, $record_id);
+  }
+
+  # The "phone_numbers" field requires parsing the phone_numbers table
+  if ($field eq "phone_numbers") {
+    # Only used by businesses, no need to pass the $table into the function
+    return get_phone_numbers($record_id);
+  }
+
+  # The "business_types" field requires parsing the business_types_businesses table
+  # to return matching records in the business_types table
+  if ($field eq "business_types") {
+    # Only used by businesses, no need to pass the $table into the function
+    return get_business_types($record_id);
+  }
+
+  ###################
+  # End special cases
+  ################### 
+
+  # Fallback case, return the field directly out of the $RailsDB hash
+  return $RailsDB{$table}{$record_id}{$field};
+}
+
+# Build the location string by following the breadcrumbs in the locations table
+# build_locataion(<locatable_type>, <locatable_id>)
+#   locatable_type: record type (allowed "Business" or "VolunteerOpportunity")
+#   locatable_id:   record id
+sub build_location {
+  my ($locatable_type, $locatable_id) = @_;
+  my @ret_location;
+
+  # Iterate over the locationships table
+  foreach $locationships_id (keys(%{$RailsDB{locationships}})) {
+    my $locationships_record = get_record("locationships", $locationships_id);
+
+    # Does this record match what we're looking for?
+    if (($$locationships_record{locatable_id} == $locatable_id) and
+    ($$locationships_record{locatable_type} eq $locatable_type)) {
+
+      # Get the associated record from the locations table
+      # print "Building location with locations[".$$locationships_record{location_id}."]\n";
+      my $locations_record = get_record("locations", $$locationships_record{location_id});
+
+      # Add the location to the ret_location array (check to see if it is already filled)
+      # print "Checking ret_location[".$$locations_record{ancestry_depth}."]\n";
+      if (not $ret_location[$$locations_record{ancestry_depth}]) {
+        $ret_location[$$locations_record{ancestry_depth}] = $$locations_record{name};
+      } else {
+        # TODO: Need to be able to handle this case where multiple locations are listed
+        # print "Working on businesses record $locatable_id ".get_field("businesses", $locatable_id, "name")."\n";
+        # print "Tried to fill ret_location[".$$locations_record{ancestry_depth}."]\n";
+        # print "\twith ".$$locations_record{name}."\n";
+        # print "It is already filled, there may be a problem\n";
+        # print "The ret_location is currently: ".join(" > ", @ret_location)."\n";
+      }
     }
   }
+
+  return join(" > ", @ret_location);
 }
+
+# get_phone_numbers(<business_id>)
+#   business_id: Record id in the businesses table
+sub get_phone_numbers {
+  my ($business_id) = @_;
+  my @ret_phone_numbers = ("", "", ""); # There are potentially 3 associated phone numbers
+  my $ret_phone_numbers_index = 0;      # Used to insert number in right slot
+
+  # Iterate over the phone_numbers table and associate a business with its phone number(s)
+  foreach $phone_numbers_id (keys(%{$RailsDB{phone_numbers}})) {
+    my $phone_numbers_record = get_record("phone_numbers", $phone_numbers_id);
+
+    if(($$phone_numbers_record{phone_numberable_id} == $business_id) and
+    ($$phone_numbers_record{phone_numberable_type} eq "Business")) {
+      # TODO: Decide how to handle the (optional) description in Pods, not used right now
+      $ret_phone_numbers[$ret_phone_numbers_index] = $$phone_numbers_record{number};
+      $ret_phone_numbers_index += 1;
+    }
+  }
+  
+  return join(",", @ret_phone_numbers);
+}
+
+# get_business_types(<business_id>)
+#   business_id: Record id in the businesses table
+sub get_business_types {
+  my ($business_id) = @_;
+  my @ret_types;
+
+  # Iterate over the business_types_businesses table and associate a business with its business_type(s)
+  foreach $b_t_b_id (keys(%{$RailsDB{business_types_businesses}})) {
+    my $b_t_b_record = get_record("business_types_businesses", $b_t_b_id);
+    if($$b_t_b_record{business_id} == $business_id) {
+      push @ret_types, (get_field("business_types", $$b_t_b_record{business_type_id}, "name"));
+    }
+  }
+
+  return join(";", @ret_types);
+}
+
+##########################################
+# Old getter functions
 
 sub get_volunteer_types {
   my $vol_opp_id = pop;
@@ -258,83 +390,6 @@ sub get_volunteer_types {
   }
 }
 
-sub get_phone_numbers {
-  my $business_id = pop;
-  my @ret_phone_numbers;
-  # Iterate over the phone_numbers table and associate a business with its phone number(s)
-  foreach $table_id (keys(%{$RailsDB{phone_numbers}})) {
-    if(($RailsDB{phone_numbers}{$table_id}{phone_numberable_id} == $business_id) and
-       ($RailsDB{phone_numbers}{$table_id}{phone_numberable_type} eq "Business")) {
-      my $business = $RailsDB{businesses}{$business_id}{name};
-      my $phone_number = $RailsDB{phone_numbers}{$table_id}{number};
-      # print "In phone_numbers{$table_id} found business{$business_id} ($business) with phone number ($phone_number)\n";
-      push @ret_phone_numbers, ($phone_number);
-    }
-  }
-
-  # The phone number field can't handle multiple phone numbers, so I added an alt/alt2_phone field
-  # This subroutine returns both fields, so if there is only one number then it returns a blank field
-  # The separator is a comma (,) as opposed to the semicolon used for other multiple value fields
-  # Start with a sanity check to make sure there aren't more than three numbers
-  if(scalar(@ret_phone_numbers) > 3) {
-    die "There are more than three phone numbers for business_id $business_id\n";
-  } elsif(scalar(@ret_phone_numbers == 3)) {
-    return join(",", @ret_phone_numbers);
-  } elsif(scalar(@ret_phone_numbers == 2)) {
-    return join(",", @ret_phone_numbers).",";
-  } else {
-    return $ret_phone_numbers[0].",,";
-  }
-}
-
-sub get_locations {
-  my $business_id = pop;
-  # Web Directory Free really only wants one location (the deepest one in the locations hierachy)
-  # my @ret_locations;
-  my $ret_location;
-  my $deepest_location = -1; # Must be -1 to make the loop work
-  # Iterate over the locationships table and associate a business with its locations(s)
-  foreach $table_id (keys(%{$RailsDB{locationships}})) {
-    if(($RailsDB{locationships}{$table_id}{locatable_id} == $business_id) and
-       ($RailsDB{locationships}{$table_id}{locatable_type} eq "Business")) {
-      my $business = $RailsDB{businesses}{$business_id}{name};
-      my $location_id = $RailsDB{locationships}{$table_id}{location_id};
-      my $location = $RailsDB{locations}{$location_id}{name};
-      my $ancestry_depth = $RailsDB{locations}{$location_id}{ancestry_depth};
-      my $ancestry = $RailsDB{locations}{$location_id}{ancestry};
-      # parse the depth and ancestry to create the location string
-      my $location_string;
-      if ($ancestry_depth == 0) {
-        $location_string = $location;
-      } else {
-        foreach $ancestor_id (split(/\//, $ancestry)) {
-          $location_string .= $RailsDB{locations}{$ancestor_id}{name}." > ";
-        }
-        $location_string .= $location;
-      }
-      # print "In locationships{$table_id} found business{$business_id} ($business) with location{$location_id} ($location_string)\n";
-      # Only update $ret_location if this is a deeper ancestor
-      # push @ret_locations, ($location_string);
-      # print "deepest location ($deepest_location) current depth ($ancestry_depth) ";
-      if($ancestry_depth > $deepest_location) {
-        $ret_location = $location_string;
-        $deepest_location = $ancestry_depth;
-        # print "Update the location\n";
-      } else {
-        # print "Not the deepest ancestor\n";
-      }
-    }
-  }
-
-  # If there are multiple locations associated with this business, make sure it has the correct separator (;)
-  # Only print out one location (unless there is a need in the future)
-  # if(scalar(@ret_locations) > 1) {
-  #   return join(";", @ret_locations);
-  # } else {
-  #   return $ret_locations[0];
-  # }
-  return $ret_location;
-}
 
 sub get_address {
   # Start with the raw string from the rails sql file
