@@ -23,7 +23,10 @@ while(! eof($input_fh)) {
        ($table_name eq "business_types_businesses") or
        ($table_name eq "phone_numbers") or
        ($table_name eq "locations") or
-       ($table_name eq "locationships")) {
+       ($table_name eq "locationships") or
+       ($table_name eq "volunteer_opportunities") or
+       ($table_name eq "volunteer_types") or
+       ($table_name eq "volunteer_opportunities_volunteer_types")) {
       # Parse the rows
       my $table_rows = parse_table_rows($input_fh);
       # Print the table csv
@@ -129,7 +132,8 @@ sub store_table_in_RailsDB {
     # Populate the data structure (got the hash mapping from https://www.perlmonks.org/?node_id=4402)
     my %hashed_row;
     @hashed_row{@$header} = @$row;
-    # I think this is only needed for the business_types_businesses table
+    # I think this is only needed for the business_types_businesses and
+    # volunteer_opportunities_volunteer_types tables
     # If there is no "id" field, add one
     if(defined $hashed_row{id}) {
       $RailsDB{$name}{$hashed_row{id}} = \%hashed_row;
@@ -142,16 +146,22 @@ sub store_table_in_RailsDB {
 
 # Print the final import file
 sub print_Pods_import {
-  # Open the csv file for writing
-  open(my $PODSimport_fh, ">", "Pods_import.csv")
-    || die "Can't open > Pods_import.csv: $!";
+  # Open the csv files for writing
+  # open(my $PODSimport_fh, ">", "Pods_import.csv")
+  #   || die "Can't open > Pods_import.csv: $!";
+  open(my $PODS_businesses_fh, ">", "Pods_Businesses_import.csv")
+    || die "Can't open > Pods_Businesses_import.csv: $!";
+  open(my $PODS_vol_opps_fh, ">", "Pods_VolunteerOpportunities.csv")
+    || die "Can't open > Pods_VolunteerOpportunities.csv: $!";
 
-  # CSV structure for Pods import file
-  my @Pods_header = qw(company_name locations address phone_1 phone_2 phone_3
-                       web categories description latitude longitude hours short_location);
+  # CSV structure for Pods busineses import file
+  my @Pods_businesses_header = qw(company_name locations address
+                                  phone_1 phone_2 phone_3
+                                  web categories description latitude longitude
+                                  hours short_location);
 
-  # Print the header
-  print $PODSimport_fh join(",", @Pods_header)."\n";
+  # Print the businesses header
+  print $PODS_businesses_fh join(",", @Pods_businesses_header)."\n";
 
   # Iterate across the entries in the "businesses" table and print them to the output csv
   foreach $business_id (keys(%{$RailsDB{businesses}})) {
@@ -168,11 +178,47 @@ sub print_Pods_import {
       get_hours($business_id),                           # hours
       $RailsDB{businesses}{$business_id}{short_location} # short_location
     );
-    print $PODSimport_fh join(",", @output_row)."\n";
+    print $PODS_businesses_fh join(",", @output_row)."\n";
   }
 
-  # Close the csv file
-  close($PODSimport_fh);
+  # CSV structure for Pods volunteer opportunities import file
+  my @Pods_vol_opps_header = qw(vol_opp_name locations short_location
+                                organization_url volunteer_url
+                                facebook_url twitter_username
+                                volunteer_types description
+                                min_duration max_duration duration_notes
+                                fee_category fee_notes
+                                other_ways_to_help contact_info);
+
+  # Print the volunteer opportunities header
+  print $PODS_vol_opps_fh join(",", @Pods_vol_opps_header)."\n";
+
+  # Iterate across the entries in the "volunteer_opportunities" table and print them to the output csv
+  foreach $vol_opp_id (keys(%{$RailsDB{volunteer_opportunities}})) {
+    my @output_row = (
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{name},             # vol_opp_name
+      get_locations($vol_opp_id),                                       # locations
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{short_location},   # short_location
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{organization_url}, # organization_url
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{volunteer_url},    # volunteer_url
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{facebook_url},     # facebook_url
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{twitter_username}, # twitter_username
+      get_volunteer_types($vol_opp_id),                                 # volunteer_types
+      get_description($vol_opp_id),                                     # description
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{min_duration},     # min_duration
+      $RailsDB{volunteer_opportunities}{$vol_opp_id}{max_duration},     # max_duration
+      get_duration_notes($vol_opp_id),                                  # duration_notes
+      get_fee_category($vol_opp_id),                                    # fee_category
+      get_fee_notes($vol_opp_id),                                       # fee_notes
+      get_other_ways_to_help($vol_opp_id),                              # other_ways_to_help
+      get_contact_info($vol_opp_id)                                     # contact_info
+    );
+    print $PODS_vol_opps_fh join(",", @output_row)."\n";
+  }
+
+  # Close the csv files
+  close($PODS_businesses_fh);
+  close($PODS_vol_opps_fh);
 }
 
 sub get_business_types {
@@ -186,6 +232,21 @@ sub get_business_types {
       my $business_type = $RailsDB{business_types}{$business_type_id}{name};
       # print "In business_types_businesses{$table_id} found business{$business_id} ($business) matching business_types{$business_type_id} ($business_type)\n";
       push @ret_types, ($business_type);
+    }
+  }
+}
+
+sub get_volunteer_types {
+  my $vol_opp_id = pop;
+  my @ret_types;
+  # Iterate over the volunteer_opportunities_volunteer_types table and associate a volunteer_opportunity with its volunteer_type(s)
+  foreach $table_id (keys(%{$RailsDB{volunteer_opportunities_volunteer_types}})) {
+    if($RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_opportunity_id} == $vol_opp_id) {
+      my $vol_opp = $RailsDB{volunteer_opportunities}{$vol_opp_id}{name};
+      my $volunteer_type_id = $RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_type_id};
+      my $volunteer_type = $RailsDB{volunteer_types}{$volunteer_type_id}{name};
+      # print "In volunteer_opportunities_volunteer_types{$table_id} found volunteer_opportunity{$vol_opp_id} ($vol_opp) matching volunteer_types{$volunteer_type_id} ($volunteer_type)\n";
+      push @ret_types, ($volunteer_type);
     }
   }
 
@@ -336,4 +397,122 @@ sub get_hours {
 
   # Return the modified string
   return $ret_string;
+}
+
+# Volunteer opportunity fields that are potentially multi-line
+#   Right now, each subroutine just returns the string.
+#   Eventually, they should fix the fomatting (convert "\r\n" to "\n", etc)
+sub get_duration_notes {
+  # Volunteer Opportunity ID
+  my $vol_opp_id = pop;
+
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{duration_notes};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # if($ret_string =~ /\\r\\n/) {
+  #   if($ret_string !~ /^".*"$/) {
+  #     # print "Had to do the double-quote diving save for business_id $business_id\n";
+  #     $ret_string = "\"".$ret_string."\"";
+  #   }
+  # }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;
+}
+
+sub get_fee_category {
+  # Volunteer Opportunity ID
+  my $vol_opp_id = pop;
+
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{cost_suggestion};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # if($ret_string =~ /\\r\\n/) {
+  #   if($ret_string !~ /^".*"$/) {
+  #     # print "Had to do the double-quote diving save for business_id $business_id\n";
+  #     $ret_string = "\"".$ret_string."\"";
+  #   }
+  # }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;
+}
+
+sub get_fee_notes {
+  # Volunteer Opportunity ID
+  my $vol_opp_id = pop;
+
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{fees_notes};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # if($ret_string =~ /\\r\\n/) {
+  #   if($ret_string !~ /^".*"$/) {
+  #     # print "Had to do the double-quote diving save for business_id $business_id\n";
+  #     $ret_string = "\"".$ret_string."\"";
+  #   }
+  # }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;  
+}
+
+sub get_other_ways_to_help {
+  # Volunteer Opportunity ID
+  my $vol_opp_id = pop;
+
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{other_ways_to_help};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # if($ret_string =~ /\\r\\n/) {
+  #   if($ret_string !~ /^".*"$/) {
+  #     # print "Had to do the double-quote diving save for business_id $business_id\n";
+  #     $ret_string = "\"".$ret_string."\"";
+  #   }
+  # }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;  
+}
+
+sub get_contact_info {
+  # Volunteer Opportunity ID
+  my $vol_opp_id = pop;
+
+  # Start with the raw string from the rails sql file
+  my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{contact_info};
+
+  # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
+  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # if($ret_string =~ /\\r\\n/) {
+  #   if($ret_string !~ /^".*"$/) {
+  #     # print "Had to do the double-quote diving save for business_id $business_id\n";
+  #     $ret_string = "\"".$ret_string."\"";
+  #   }
+  # }
+
+  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # $ret_string =~ s/\\r\\n/, /g;
+
+  # Return the modified string
+  return $ret_string;  
 }
