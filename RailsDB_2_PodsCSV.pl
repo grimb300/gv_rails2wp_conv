@@ -179,7 +179,12 @@ sub print_Pods_import {
       get_field("businesses", $business_id, "hours"),          # hours
       get_field("businesses", $business_id, "short_location") # short_location
     );
-    print $PODS_businesses_fh join(",", @output_row)."\n";
+    # print $PODS_businesses_fh join(",", @output_row)."\n";
+    print $PODS_businesses_fh get_field("businesses", $business_id, "name")."\n";
+    foreach $loc (split(";", get_field("businesses", $business_id, "location"))) {
+      print $PODS_businesses_fh "$loc\n";
+    }
+    print $PODS_businesses_fh "\n";
   }
 
   # CSV structure for Pods volunteer opportunities import file
@@ -284,7 +289,8 @@ sub get_field {
 #   locatable_id:   record id
 sub build_location {
   my ($locatable_type, $locatable_id) = @_;
-  my @ret_location;
+  # my @ret_location;
+  my @ret_locations;
 
   # Iterate over the locationships table
   foreach $locationships_id (sort(keys(%{$RailsDB{locationships}}))) {
@@ -298,22 +304,39 @@ sub build_location {
       # print "Building location with locations[".$$locationships_record{location_id}."]\n";
       my $locations_record = get_record("locations", $$locationships_record{location_id});
 
-      # Add the location to the ret_location array (check to see if it is already filled)
-      # print "Checking ret_location[".$$locations_record{ancestry_depth}."]\n";
-      if (not $ret_location[$$locations_record{ancestry_depth}]) {
-        $ret_location[$$locations_record{ancestry_depth}] = $$locations_record{name};
+      # Build the full location tree from this endpoint
+      if ($$locations_record{ancestry_depth} == 0) {
+        # This is a root level location, nothing special to do here
+        print "Saw root level location: ".$$locations_record{name}."\n";
+        push @ret_locations, $$locations_record{name};
       } else {
-        # TODO: Need to be able to handle this case where multiple locations are listed
-        # print "Working on businesses record $locatable_id ".get_field("businesses", $locatable_id, "name")."\n";
-        # print "Tried to fill ret_location[".$$locations_record{ancestry_depth}."]\n";
-        # print "\twith ".$$locations_record{name}."\n";
-        # print "It is already filled, there may be a problem\n";
-        # print "The ret_location is currently: ".join(" > ", @ret_location)."\n";
+        # The ancestry field provides the rest of the tree
+        my @location_parts;
+        foreach $ancestor_id (split("/", $$locations_record{ancestry})) {
+          push @location_parts, get_field("locations", $ancestor_id, "name");
+        }
+        push @location_parts, $$locations_record{name};
+        # # Traverse the tree to get to the root
+        # my @location_parts;
+        # my $cur_id = $$locationships_record{location_id};
+        # my $depth; # Has to be defined outside the loop so it can be used in the until statement
+        # do {
+        #   $depth  = get_field("locations", $cur_id, "ancestry_depth");
+        #   print "At depth $depth ";
+        #   my $name   = get_field("locations", $cur_id, "name");
+        #   print "found location $name ";
+        #   my $cur_id = get_field("locations", $cur_id, "ancestry");
+        #   print "with ancestor id $cur_id. ";
+        #   $location_parts[$depth] = $name;
+        # } until ($depth == 0);
+        my $full_location = join(" > ", @location_parts);
+        # print "Which resulted in a full location: $full_location\n";
+        push @ret_locations, $full_location;
       }
     }
   }
 
-  return join(" > ", @ret_location);
+  return join(";", sort(@ret_locations));
 }
 
 # get_phone_numbers(<business_id>)
