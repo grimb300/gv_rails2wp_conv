@@ -178,17 +178,6 @@ sub print_Pods_import {
       get_field("businesses", $business_id, "longitude"),      # longitude
       get_field("businesses", $business_id, "hours"),          # hours
       get_field("businesses", $business_id, "short_location") # short_location
-      # $RailsDB{businesses}{$business_id}{name},          # company_name
-      # get_locations($business_id),                       # locations
-      # get_address($business_id),                         # address
-      # get_phone_numbers($business_id),                   # phone_1/2/3 (returns all three)
-      # $RailsDB{businesses}{$business_id}{url},           # web
-      # get_business_types($business_id),                  # categories
-      # get_description($business_id),                     # description
-      # $RailsDB{businesses}{$business_id}{latitude},      # latitude
-      # $RailsDB{businesses}{$business_id}{longitude},     # longitude
-      # get_hours($business_id),                           # hours
-      # $RailsDB{businesses}{$business_id}{short_location} # short_location
     );
     print $PODS_businesses_fh join(",", @output_row)."\n";
   }
@@ -298,7 +287,7 @@ sub build_location {
   my @ret_location;
 
   # Iterate over the locationships table
-  foreach $locationships_id (keys(%{$RailsDB{locationships}})) {
+  foreach $locationships_id (sort(keys(%{$RailsDB{locationships}}))) {
     my $locationships_record = get_record("locationships", $locationships_id);
 
     # Does this record match what we're looking for?
