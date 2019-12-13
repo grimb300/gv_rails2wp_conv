@@ -164,7 +164,8 @@ sub print_Pods_import {
   print $PODS_businesses_fh join(",", @Pods_businesses_header)."\n";
 
   # Iterate across the entries in the "businesses" table and print them to the output csv
-  foreach $business_id (keys(%{$RailsDB{businesses}})) {
+  # Sort them so they always print out in the same order
+  foreach $business_id (sort(keys(%{$RailsDB{businesses}}))) {
     my @output_row = (
       get_field("businesses", $business_id, "name"),           # company_name
       get_field("businesses", $business_id, "location"),       # locations
@@ -330,8 +331,7 @@ sub build_location {
 #   business_id: Record id in the businesses table
 sub get_phone_numbers {
   my ($business_id) = @_;
-  my @ret_phone_numbers = ("", "", ""); # There are potentially 3 associated phone numbers
-  my $ret_phone_numbers_index = 0;      # Used to insert number in right slot
+  my @ret_phone_numbers;
 
   # Iterate over the phone_numbers table and associate a business with its phone number(s)
   foreach $phone_numbers_id (keys(%{$RailsDB{phone_numbers}})) {
@@ -340,12 +340,14 @@ sub get_phone_numbers {
     if(($$phone_numbers_record{phone_numberable_id} == $business_id) and
     ($$phone_numbers_record{phone_numberable_type} eq "Business")) {
       # TODO: Decide how to handle the (optional) description in Pods, not used right now
-      $ret_phone_numbers[$ret_phone_numbers_index] = $$phone_numbers_record{number};
-      $ret_phone_numbers_index += 1;
+      push @ret_phone_numbers, ($$phone_numbers_record{number});
     }
   }
   
-  return join(",", @ret_phone_numbers);
+  # Return a string of three sorted comma separated values
+  # Make sure to fill in the array so there are three values
+  my $fill_elms = 3 - scalar(@ret_phone_numbers);
+  return join(",", (sort(@ret_phone_numbers), ("")x$fill_elms));
 }
 
 # get_business_types(<business_id>)
@@ -362,7 +364,8 @@ sub get_business_types {
     }
   }
 
-  return join(";", @ret_types);
+  # Return a string of sorted semi-colon separated values
+  return join(";", sort(@ret_types));
 }
 
 ##########################################
