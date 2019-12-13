@@ -179,12 +179,7 @@ sub print_Pods_import {
       get_field("businesses", $business_id, "hours"),          # hours
       get_field("businesses", $business_id, "short_location") # short_location
     );
-    # print $PODS_businesses_fh join(",", @output_row)."\n";
-    print $PODS_businesses_fh get_field("businesses", $business_id, "name")."\n";
-    foreach $loc (split(";", get_field("businesses", $business_id, "location"))) {
-      print $PODS_businesses_fh "$loc\n";
-    }
-    print $PODS_businesses_fh "\n";
+    print $PODS_businesses_fh join(",", @output_row)."\n";
   }
 
   # CSV structure for Pods volunteer opportunities import file
@@ -307,7 +302,6 @@ sub build_location {
       # Build the full location tree from this endpoint
       if ($$locations_record{ancestry_depth} == 0) {
         # This is a root level location, nothing special to do here
-        print "Saw root level location: ".$$locations_record{name}."\n";
         push @ret_locations, $$locations_record{name};
       } else {
         # The ancestry field provides the rest of the tree
@@ -316,27 +310,40 @@ sub build_location {
           push @location_parts, get_field("locations", $ancestor_id, "name");
         }
         push @location_parts, $$locations_record{name};
-        # # Traverse the tree to get to the root
-        # my @location_parts;
-        # my $cur_id = $$locationships_record{location_id};
-        # my $depth; # Has to be defined outside the loop so it can be used in the until statement
-        # do {
-        #   $depth  = get_field("locations", $cur_id, "ancestry_depth");
-        #   print "At depth $depth ";
-        #   my $name   = get_field("locations", $cur_id, "name");
-        #   print "found location $name ";
-        #   my $cur_id = get_field("locations", $cur_id, "ancestry");
-        #   print "with ancestor id $cur_id. ";
-        #   $location_parts[$depth] = $name;
-        # } until ($depth == 0);
         my $full_location = join(" > ", @location_parts);
-        # print "Which resulted in a full location: $full_location\n";
         push @ret_locations, $full_location;
       }
     }
   }
 
-  return join(";", sort(@ret_locations));
+  # The current list of locations includes all intermediate locations
+  # For example: "asia", "asia > thailand", and "asia > thailand > chiang mai"
+  # Reduce this so there are only unique trees
+  my @reduced_locations;
+  for ($loc_id=0;$loc_id<scalar(@ret_locations);$loc_id+=1) {
+    my $unique_loc = 1; # Assume uniqueness unless proven otherwise
+    for ($cmp_id=0;$cmp_id<scalar(@ret_locations);$cmp_id+=1) {
+      # Dont compare a location against itself
+      if ($loc_id == $cmp_id) {
+        next;
+      }
+
+      # See if $loc_id is a substring of $cmp_id starting at index 0
+      my $str_index = index($ret_locations[$cmp_id], $ret_locations[$loc_id]);
+      if ($str_index == 0) {
+        # Location at $loc_id is a substring of the one at $cmp_id, not unique
+        $unique_loc = 0;
+        # No need to keep looking
+        last;
+      }
+    }
+    # If still unique, add to the reduced array
+    if ($unique_loc) {
+      push @reduced_locations, $ret_locations[$loc_id];
+    }
+  }
+
+  return join(";", sort(@reduced_locations));
 }
 
 # get_phone_numbers(<business_id>)
