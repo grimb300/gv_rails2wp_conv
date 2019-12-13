@@ -192,30 +192,31 @@ sub print_Pods_import {
                                 other_ways_to_help contact_info);
 
   # Print the volunteer opportunities header
-  #print $PODS_vol_opps_fh join(",", @Pods_vol_opps_header)."\n";
+  print $PODS_vol_opps_fh join(",", @Pods_vol_opps_header)."\n";
 
   # Iterate across the entries in the "volunteer_opportunities" table and print them to the output csv
-  # foreach $vol_opp_id (keys(%{$RailsDB{volunteer_opportunities}})) {
-  #   my @output_row = (
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{name},             # vol_opp_name
-  #     get_locations($vol_opp_id),                                       # locations
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{short_location},   # short_location
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{organization_url}, # organization_url
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{volunteer_url},    # volunteer_url
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{facebook_url},     # facebook_url
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{twitter_username}, # twitter_username
-  #     get_volunteer_types($vol_opp_id),                                 # volunteer_types
-  #     get_description($vol_opp_id),                                     # description
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{min_duration},     # min_duration
-  #     $RailsDB{volunteer_opportunities}{$vol_opp_id}{max_duration},     # max_duration
-  #     get_duration_notes($vol_opp_id),                                  # duration_notes
-  #     get_fee_category($vol_opp_id),                                    # fee_category
-  #     get_fee_notes($vol_opp_id),                                       # fee_notes
-  #     get_other_ways_to_help($vol_opp_id),                              # other_ways_to_help
-  #     get_contact_info($vol_opp_id)                                     # contact_info
-  #   );
-  #   print $PODS_vol_opps_fh join(",", @output_row)."\n";
-  # }
+  # Sort them so they always print out in the same order
+  foreach $vol_opp_id (sort(keys(%{$RailsDB{volunteer_opportunities}}))) {
+    my @output_row = (
+      get_field("volunteer_opportunities", $vol_opp_id, "name"),               # vol_opp_name
+      get_field("volunteer_opportunities", $vol_opp_id, "location"),           # locations
+      get_field("volunteer_opportunities", $vol_opp_id, "short_location"),     # short_location
+      get_field("volunteer_opportunities", $vol_opp_id, "organization_url"),   # organization_url
+      get_field("volunteer_opportunities", $vol_opp_id, "volunteer_url"),      # volunteer_url
+      get_field("volunteer_opportunities", $vol_opp_id, "facebook_url"),       # facebook_url
+      get_field("volunteer_opportunities", $vol_opp_id, "twitter_username"),   # twitter_username
+      get_field("volunteer_opportunities", $vol_opp_id, "volunteer_types"),    # volunteer_types
+      get_field("volunteer_opportunities", $vol_opp_id, "description"),        # description
+      get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
+      get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
+      get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "fee_category"),       # fee_category
+      get_field("volunteer_opportunities", $vol_opp_id, "fee_notes"),          # fee_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
+      get_field("volunteer_opportunities", $vol_opp_id, "contact_info")        # contact_info
+    );
+    print $PODS_vol_opps_fh join(",", @output_row)."\n";
+  }
 
   # Close the csv files
   close($PODS_businesses_fh);
@@ -253,7 +254,6 @@ sub get_field {
     my $locatable_type = ($table eq "businesses")              ? "Business" :
                          ($table eq "volunteer_opportunities") ? "VolunteerOpportunity" :
                          die "Table \"$table\" is not defined for field \"location\"\n";
-    # print "Calling build_location($locatable_type, $record_id)\n";
     return build_location($locatable_type, $record_id);
   }
 
@@ -270,6 +270,13 @@ sub get_field {
     return get_business_types($record_id);
   }
 
+  # The "volunteer_types" field requires parsing the volunteer_opportunities_volunteer_types table
+  # to return matching records in the volunteer_types table
+  if ($field eq "volunteer_types") {
+    # Only used by volunteer_opportunities, no need to pass the $table into the function
+    return get_volunteer_types($record_id);
+  }
+
   ###################
   # End special cases
   ################### 
@@ -284,7 +291,6 @@ sub get_field {
 #   locatable_id:   record id
 sub build_location {
   my ($locatable_type, $locatable_id) = @_;
-  # my @ret_location;
   my @ret_locations;
 
   # Iterate over the locationships table
@@ -387,30 +393,49 @@ sub get_business_types {
   return join(";", sort(@ret_types));
 }
 
-##########################################
-# Old getter functions
-
+# get_volunteer_types(<vol_opp_id>)
+#   vol_opp_id: Record id in the volunteer_opportunities table
 sub get_volunteer_types {
-  my $vol_opp_id = pop;
+  my ($vol_opp_id) = @_;
   my @ret_types;
-  # Iterate over the volunteer_opportunities_volunteer_types table and associate a volunteer_opportunity with its volunteer_type(s)
-  foreach $table_id (keys(%{$RailsDB{volunteer_opportunities_volunteer_types}})) {
-    if($RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_opportunity_id} == $vol_opp_id) {
-      my $vol_opp = $RailsDB{volunteer_opportunities}{$vol_opp_id}{name};
-      my $volunteer_type_id = $RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_type_id};
-      my $volunteer_type = $RailsDB{volunteer_types}{$volunteer_type_id}{name};
-      # print "In volunteer_opportunities_volunteer_types{$table_id} found volunteer_opportunity{$vol_opp_id} ($vol_opp) matching volunteer_types{$volunteer_type_id} ($volunteer_type)\n";
-      push @ret_types, ($volunteer_type);
+
+  # Iterate over the volunteer_opportunities_volunteer_types table
+  # and associate a volunteer_opportunity with its volunteer_type(s)
+  foreach $vol_opp_vol_type_id (keys(%{$RailsDB{volunteer_opportunities_volunteer_types}})) {
+    my $vol_opp_vol_type_record = get_record("volunteer_opportunities_volunteer_types", $vol_opp_vol_type_id);
+    if($$vol_opp_vol_type_record{volunteer_opportunity_id} == $vol_opp_id) {
+      push @ret_types, (get_field("volunteer_types", $$vol_opp_vol_type_record{volunteer_type_id}, "name"));
     }
   }
 
-  # If there are multiple types associated with this business, make sure it has the correct separator (;)
-  if(scalar(@ret_types) > 1) {
-    return join(";", @ret_types);
-  } else {
-    return $ret_types[0];
-  }
+  # Return a string of sorted semi-colon separated values
+  return join(";", sort(@ret_types));
 }
+
+##########################################
+# Old getter functions
+
+# sub get_volunteer_types {
+#   my $vol_opp_id = pop;
+#   my @ret_types;
+#   # Iterate over the volunteer_opportunities_volunteer_types table and associate a volunteer_opportunity with its volunteer_type(s)
+#   foreach $table_id (keys(%{$RailsDB{volunteer_opportunities_volunteer_types}})) {
+#     if($RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_opportunity_id} == $vol_opp_id) {
+#       my $vol_opp = $RailsDB{volunteer_opportunities}{$vol_opp_id}{name};
+#       my $volunteer_type_id = $RailsDB{volunteer_opportunities_volunteer_types}{$table_id}{volunteer_type_id};
+#       my $volunteer_type = $RailsDB{volunteer_types}{$volunteer_type_id}{name};
+#       # print "In volunteer_opportunities_volunteer_types{$table_id} found volunteer_opportunity{$vol_opp_id} ($vol_opp) matching volunteer_types{$volunteer_type_id} ($volunteer_type)\n";
+#       push @ret_types, ($volunteer_type);
+#     }
+#   }
+
+#   # If there are multiple types associated with this business, make sure it has the correct separator (;)
+#   if(scalar(@ret_types) > 1) {
+#     return join(";", @ret_types);
+#   } else {
+#     return $ret_types[0];
+#   }
+# }
 
 
 sub get_address {
