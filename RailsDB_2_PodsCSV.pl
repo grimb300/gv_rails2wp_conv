@@ -38,12 +38,12 @@ while(! eof($input_fh)) {
 }
 
 # Debug message to see the structure of %RailsDB
-print "RailsDB has ".scalar(keys(%RailsDB))." tables\n";
+# print "RailsDB has ".scalar(keys(%RailsDB))." tables\n";
 foreach $t_name (keys(%RailsDB)) {
-  print "\tTable $t_name has ".scalar(keys(%{$RailsDB{$t_name}}))." rows\n";
+  # print "\tTable $t_name has ".scalar(keys(%{$RailsDB{$t_name}}))." rows\n";
   my @t_ids = keys(%{$RailsDB{$t_name}});
   my $t_id = $t_ids[0];
-  print "\t\tRow with id $t_id has headers: ".join(", ", keys(%{$RailsDB{$t_name}{$t_id}}))."\n";
+  # print "\t\tRow with id $t_id has headers: ".join(", ", keys(%{$RailsDB{$t_name}{$t_id}}))."\n";
 }
 
 # Close the input file
@@ -80,21 +80,67 @@ sub parse_table_rows {
   # Parse the file handle until the end condition is met (in this case "\.")
   for (my $line=get_next_line($fh); $line ne '\.'; $line=get_next_line($fh)) {
     my @values = split(/\t/, $line);
-    # Sanitize the data
+    # Sanitize the text
     #  If the value contains a comma(,) or double quote(")
     #  the entire value must be quoted after escaping the double quote(\")
-    for (my $i=0; $i<=$#values; $i++) {
-      my $modval = $values[$i];
-      if($modval =~ /[,"]/) {
-        $modval =~ s/"/\\"/g;
-        $values[$i] = "\"$modval\"";
-      }
+    foreach $val (@values) {
+      $val = sanitize_text($val);
+      # if ($val =~ /[,"]/) {
+      #   $val =~ s/"/\\"/g;
+      #   $val = "\"$val\"";
+      # }
     }
+    # for (my $i=0; $i<=$#values; $i++) {
+    #   my $modval = $values[$i];
+    #   if($modval =~ /[,"]/) {
+    #     $modval =~ s/"/\\"/g;
+    #     $values[$i] = "\"$modval\"";
+    #   }
+    # }
     push @$ret_rows, \@values;
   }
 
   return $ret_rows;
 }
+
+# The text coming from the rails DB needs to be sanitized to be legal for a CSV file
+# sanitize_text(<dirty_text>)
+#   dirty_text: text that isn't clean
+sub sanitize_text {
+  my ($dirty_text) = @_;
+  my $clean_text = $dirty_text;
+
+  # Pet peve... Strip off any errant spaces or return/newlines ("\r\n") from the beginning/end of the field text
+  my $no_leading_trailing_whitespace_text = $clean_text;
+  $no_leading_trailing_whitespace_text =~ s/^(\s|(\\r\\n))+//; # leading whitespace
+  $no_leading_trailing_whitespace_text =~ s/(\s|(\\r\\n))+$//; # trailing whitespace
+  $clean_text = $no_leading_trailing_whitespace_text;
+
+  # Strip out the return/newline ("\r\n") and convert them to a newline (\n)
+  my $no_cr_nl_text = $clean_text;
+  $no_cr_nl_text =~ s/\\r\\n/\n/g;
+  $clean_text = $no_cr_nl_text;
+
+
+  # Any double-quotes must be escaped
+  my $esc_double_quotes_text = $clean_text;
+  $esc_double_quotes_text =~ s/"/\\"/g;
+  if ($clean_text =~ /"/) {
+    print "Field has a double quote in it:\n";
+    print "$clean_text\n";
+    print "Modified text is:\n$esc_double_quotes_text\n";
+  }
+  $clean_text = $esc_double_quotes_text;
+
+  # If there are commas, escaped double-quotes, or newlines, the entire string needs to be quoted
+  if ($clean_text =~ /(,|(\\")|\n)/) {
+    $clean_text = "\"$clean_text\"";
+  }
+
+  # Return the clean text
+  return $clean_text;
+}
+
 
 # Print the table csv
 sub print_table_csv {
@@ -124,11 +170,6 @@ sub store_table_in_RailsDB {
   # Iterate accross the rows
   my $id = 0;
   foreach $row (@$rows) {
-    # Trying to debug a problem, only store the businesses entry for "Lila Thai Massage"
-    # if(($name eq "businesses") and ($$row[3] ne "Lila Thai Massage")) {
-    #   next
-    # }
-
     # Populate the data structure (got the hash mapping from https://www.perlmonks.org/?node_id=4402)
     my %hashed_row;
     @hashed_row{@$header} = @$row;
@@ -169,14 +210,14 @@ sub print_Pods_import {
     my @output_row = (
       get_field("businesses", $business_id, "name"),              # company_name
       get_field("businesses", $business_id, "location"),          # locations
-      get_field("businesses", $business_id, "clean_address"),     # address
+      get_field("businesses", $business_id, "address"),     # address
       get_field("businesses", $business_id, "phone_numbers"),     # phone_1/2/3 (returns all three)
       get_field("businesses", $business_id, "url"),               # web
       get_field("businesses", $business_id, "business_types"),    # categories
-      get_field("businesses", $business_id, "clean_description"), # description
+      get_field("businesses", $business_id, "description"), # description
       get_field("businesses", $business_id, "latitude"),          # latitude
       get_field("businesses", $business_id, "longitude"),         # longitude
-      get_field("businesses", $business_id, "clean_hours"),       # hours
+      get_field("businesses", $business_id, "hours"),       # hours
       get_field("businesses", $business_id, "short_location")     # short_location
     );
     print $PODS_businesses_fh join(",", @output_row)."\n";
@@ -206,14 +247,14 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "facebook_url"),       # facebook_url
       get_field("volunteer_opportunities", $vol_opp_id, "twitter_username"),   # twitter_username
       get_field("volunteer_opportunities", $vol_opp_id, "volunteer_types"),    # volunteer_types
-      get_field("volunteer_opportunities", $vol_opp_id, "clean_description"),  # description
+      get_field("volunteer_opportunities", $vol_opp_id, "description"),  # description
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
-      get_field("volunteer_opportunities", $vol_opp_id, "clean_duration_notes"),     # duration_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
       get_field("volunteer_opportunities", $vol_opp_id, "num_dollar_signs"),   # cost_suggestion
-      get_field("volunteer_opportunities", $vol_opp_id, "clean_fees_notes"),         # fees_notes
-      get_field("volunteer_opportunities", $vol_opp_id, "clean_other_ways_to_help"), # other_ways_to_help
-      get_field("volunteer_opportunities", $vol_opp_id, "clean_contact_info")  # contact_info
+      get_field("volunteer_opportunities", $vol_opp_id, "fees_notes"),         # fees_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
+      get_field("volunteer_opportunities", $vol_opp_id, "contact_info")  # contact_info
     );
     print $PODS_vol_opps_fh join(",", @output_row)."\n";
   }
