@@ -167,17 +167,17 @@ sub print_Pods_import {
   # Sort them so they always print out in the same order
   foreach $business_id (sort(keys(%{$RailsDB{businesses}}))) {
     my @output_row = (
-      get_field("businesses", $business_id, "name"),           # company_name
-      get_field("businesses", $business_id, "location"),       # locations
-      get_field("businesses", $business_id, "address"),        # address
-      get_field("businesses", $business_id, "phone_numbers"),  # phone_1/2/3 (returns all three)
-      get_field("businesses", $business_id, "url"),            # web
-      get_field("businesses", $business_id, "business_types"), # categories
-      get_field("businesses", $business_id, "description"),    # description
-      get_field("businesses", $business_id, "latitude"),       # latitude
-      get_field("businesses", $business_id, "longitude"),      # longitude
-      get_field("businesses", $business_id, "hours"),          # hours
-      get_field("businesses", $business_id, "short_location") # short_location
+      get_field("businesses", $business_id, "name"),              # company_name
+      get_field("businesses", $business_id, "location"),          # locations
+      get_field("businesses", $business_id, "address"),           # address
+      get_field("businesses", $business_id, "phone_numbers"),     # phone_1/2/3 (returns all three)
+      get_field("businesses", $business_id, "url"),               # web
+      get_field("businesses", $business_id, "business_types"),    # categories
+      get_field("businesses", $business_id, "clean_description"), # description
+      get_field("businesses", $business_id, "latitude"),          # latitude
+      get_field("businesses", $business_id, "longitude"),         # longitude
+      get_field("businesses", $business_id, "hours"),             # hours
+      get_field("businesses", $business_id, "short_location")     # short_location
     );
     print $PODS_businesses_fh join(",", @output_row)."\n";
   }
@@ -206,7 +206,7 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "facebook_url"),       # facebook_url
       get_field("volunteer_opportunities", $vol_opp_id, "twitter_username"),   # twitter_username
       get_field("volunteer_opportunities", $vol_opp_id, "volunteer_types"),    # volunteer_types
-      get_field("volunteer_opportunities", $vol_opp_id, "description"),        # description
+      get_field("volunteer_opportunities", $vol_opp_id, "clean_description"),  # description
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
       get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
@@ -281,6 +281,11 @@ sub get_field {
   if ($field eq "num_dollar_signs") {
     # Only used by volunteer_opportunities, no need to pass the $table into the function
     return decode_cost_suggestion($record_id);
+  }
+
+  # Clean the description
+  if ($field eq "clean_description") {
+    return clean_text(get_field($table, $record_id, "description"));
   }
 
   ###################
@@ -422,11 +427,9 @@ sub get_volunteer_types {
 #   vol_opp_id: Record id in the volunteer_opportunities table
 sub decode_cost_suggestion {
   my ($vol_opp_id) = @_;
-  print "Entered decode_cost_suggestion for id: $vol_opp_id\n";
 
   # The cost_suggestion field in the volunteer_opportunities table represents the number of $'s to print
   my $num_dollar_signs = get_field("volunteer_opportunities", $vol_opp_id, "cost_suggestion");
-  print "ID $vol_opp_id will have $num_dollar_signs dollar signs\n";
   
   # Special case, 0 dollar signs returns "FREE"
   if ($num_dollar_signs == 0) {
@@ -434,6 +437,21 @@ sub decode_cost_suggestion {
   }
   # Else, return a string of $'s
   return "\$" x $num_dollar_signs;
+}
+
+# The text coming from the rails DB uses things that don't work so well for WordPress
+#   "\r\n" => an actual newline (\n)
+# clean_text(<dirty_text>)
+#   dirty_text: text that isn't clean
+sub clean_text {
+  my ($dirty_text) = @_;
+
+  # Strip out the carriage return/newline ("\r\n") from the Rails DB and convert them to a newline (\n)
+  my $no_cr_nl_text = $dirty_text;
+  $no_cr_nl_text =~ s/\\r\\n/\n/g;
+
+  # Return the clean text
+  return $no_cr_nl_text;
 }
 
 ##########################################
