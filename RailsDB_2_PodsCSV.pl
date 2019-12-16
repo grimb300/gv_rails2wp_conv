@@ -210,8 +210,8 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
       get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
-      get_field("volunteer_opportunities", $vol_opp_id, "fee_category"),       # fee_category
-      get_field("volunteer_opportunities", $vol_opp_id, "fee_notes"),          # fee_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "num_dollar_signs"),   # cost_suggestion
+      get_field("volunteer_opportunities", $vol_opp_id, "fees_notes"),         # fees_notes
       get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
       get_field("volunteer_opportunities", $vol_opp_id, "contact_info")        # contact_info
     );
@@ -275,6 +275,12 @@ sub get_field {
   if ($field eq "volunteer_types") {
     # Only used by volunteer_opportunities, no need to pass the $table into the function
     return get_volunteer_types($record_id);
+  }
+
+  # Map the cost suggestion from a number of $'s (0-3) into the appropriate string (FREE, $, $$, or $$$)
+  if ($field eq "num_dollar_signs") {
+    # Only used by volunteer_opportunities, no need to pass the $table into the function
+    return decode_cost_suggestion($record_id);
   }
 
   ###################
@@ -410,6 +416,24 @@ sub get_volunteer_types {
 
   # Return a string of sorted semi-colon separated values
   return join(";", sort(@ret_types));
+}
+
+# decode_cost_suggestion(<vol_opp_id>)
+#   vol_opp_id: Record id in the volunteer_opportunities table
+sub decode_cost_suggestion {
+  my ($vol_opp_id) = @_;
+  print "Entered decode_cost_suggestion for id: $vol_opp_id\n";
+
+  # The cost_suggestion field in the volunteer_opportunities table represents the number of $'s to print
+  my $num_dollar_signs = get_field("volunteer_opportunities", $vol_opp_id, "cost_suggestion");
+  print "ID $vol_opp_id will have $num_dollar_signs dollar signs\n";
+  
+  # Special case, 0 dollar signs returns "FREE"
+  if ($num_dollar_signs == 0) {
+    return "FREE";
+  }
+  # Else, return a string of $'s
+  return "\$" x $num_dollar_signs;
 }
 
 ##########################################
