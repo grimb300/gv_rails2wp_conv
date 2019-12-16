@@ -169,14 +169,14 @@ sub print_Pods_import {
     my @output_row = (
       get_field("businesses", $business_id, "name"),              # company_name
       get_field("businesses", $business_id, "location"),          # locations
-      get_field("businesses", $business_id, "address"),           # address
+      get_field("businesses", $business_id, "clean_address"),     # address
       get_field("businesses", $business_id, "phone_numbers"),     # phone_1/2/3 (returns all three)
       get_field("businesses", $business_id, "url"),               # web
       get_field("businesses", $business_id, "business_types"),    # categories
       get_field("businesses", $business_id, "clean_description"), # description
       get_field("businesses", $business_id, "latitude"),          # latitude
       get_field("businesses", $business_id, "longitude"),         # longitude
-      get_field("businesses", $business_id, "hours"),             # hours
+      get_field("businesses", $business_id, "clean_hours"),       # hours
       get_field("businesses", $business_id, "short_location")     # short_location
     );
     print $PODS_businesses_fh join(",", @output_row)."\n";
@@ -209,11 +209,11 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "clean_description"),  # description
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
-      get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "clean_duration_notes"),     # duration_notes
       get_field("volunteer_opportunities", $vol_opp_id, "num_dollar_signs"),   # cost_suggestion
-      get_field("volunteer_opportunities", $vol_opp_id, "fees_notes"),         # fees_notes
-      get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
-      get_field("volunteer_opportunities", $vol_opp_id, "contact_info")        # contact_info
+      get_field("volunteer_opportunities", $vol_opp_id, "clean_fees_notes"),         # fees_notes
+      get_field("volunteer_opportunities", $vol_opp_id, "clean_other_ways_to_help"), # other_ways_to_help
+      get_field("volunteer_opportunities", $vol_opp_id, "clean_contact_info")  # contact_info
     );
     print $PODS_vol_opps_fh join(",", @output_row)."\n";
   }
@@ -283,9 +283,10 @@ sub get_field {
     return decode_cost_suggestion($record_id);
   }
 
-  # Clean the description
-  if ($field eq "clean_description") {
-    return clean_text(get_field($table, $record_id, "description"));
+  # Clean the description, address, hours, contact_info
+  my $field_to_clean = $field;
+  if ($field_to_clean =~ s/^clean_//) {
+    return clean_text(get_field($table, $record_id, $field_to_clean));
   }
 
   ###################
@@ -445,13 +446,32 @@ sub decode_cost_suggestion {
 #   dirty_text: text that isn't clean
 sub clean_text {
   my ($dirty_text) = @_;
+  my $clean_text = $dirty_text;
 
-  # Strip out the carriage return/newline ("\r\n") from the Rails DB and convert them to a newline (\n)
-  my $no_cr_nl_text = $dirty_text;
+  # Pet peve... Strip off any errant spaces or return/newlines ("\r\n") from the beginning/end of the field text
+  my $no_leading_trailing_whitespace_text = $clean_text;
+  $no_leading_trailing_whitespace_text =~ s/^\s+//;       # leading whitespace
+  $no_leading_trailing_whitespace_text =~ s/\s+$//;       # trailing whitespace
+  $no_leading_trailing_whitespace_text =~ s/(\\r\\n)+$//; # trailing retun/newline
+  $clean_text = $no_leading_trailing_whitespace_text;
+
+
+  # If there are any return/newlines ("\r\n"), need to make sure there are quotes around the field text
+  my $add_quotes_text = $clean_text;
+  if ($add_quotes_text =~ /\\r\\n/) {
+    if ($add_quotes_text !~ /^".*"$/) {
+      $add_quotes_text = "\"$add_quotes_text\"";
+    }
+  }
+  $clean_text = $add_quotes_text;
+
+  # Strip out the return/newline ("\r\n") from the Rails DB and convert them to a newline (\n)
+  my $no_cr_nl_text = $clean_text;
   $no_cr_nl_text =~ s/\\r\\n/\n/g;
+  $clean_text = $no_cr_nl_text;
 
   # Return the clean text
-  return $no_cr_nl_text;
+  return $clean_text;
 }
 
 ##########################################
@@ -485,7 +505,7 @@ sub get_address {
   my $ret_string = $RailsDB{businesses}{$business_id}{address};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -493,7 +513,7 @@ sub get_address {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
@@ -506,7 +526,7 @@ sub get_description {
   my $ret_string = $RailsDB{businesses}{$business_id}{description};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If a description has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If a description has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -514,7 +534,7 @@ sub get_description {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a single newline (\n\n)
+  # Replace the Rails/SQL return-newline (\r\n) with a single newline (\n\n)
   # $ret_string =~ s/\\r\\n/\n/g;
 
   # Remove the Rails more tag
@@ -554,7 +574,7 @@ sub get_duration_notes {
   my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{duration_notes};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -562,7 +582,7 @@ sub get_duration_notes {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
@@ -577,7 +597,7 @@ sub get_fee_category {
   my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{cost_suggestion};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -585,7 +605,7 @@ sub get_fee_category {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
@@ -600,7 +620,7 @@ sub get_fee_notes {
   my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{fees_notes};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -608,7 +628,7 @@ sub get_fee_notes {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
@@ -623,7 +643,7 @@ sub get_other_ways_to_help {
   my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{other_ways_to_help};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -631,7 +651,7 @@ sub get_other_ways_to_help {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
@@ -646,7 +666,7 @@ sub get_contact_info {
   my $ret_string = $RailsDB{volunteer_opportunities}{$vol_opp_id}{contact_info};
 
   # Not sure where else to do this right now cuz doing it in the sanitize section above broke other things
-  # If an address has a carriage return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
+  # If an address has a return and newline (\r\n), but doesn't already have quotes around it ("..."), add it now
   # if($ret_string =~ /\\r\\n/) {
   #   if($ret_string !~ /^".*"$/) {
   #     # print "Had to do the double-quote diving save for business_id $business_id\n";
@@ -654,7 +674,7 @@ sub get_contact_info {
   #   }
   # }
 
-  # Replace the Rails/SQL carriage return-newline (\r\n) with a comma and a space (, )
+  # Replace the Rails/SQL return-newline (\r\n) with a comma and a space (, )
   # $ret_string =~ s/\\r\\n/, /g;
 
   # Return the modified string
