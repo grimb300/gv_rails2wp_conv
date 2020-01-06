@@ -28,7 +28,7 @@ while(! eof($input_fh)) {
        ($table_name eq "volunteer_types") or
        ($table_name eq "volunteer_opportunities_volunteer_types")) {
       # Parse the rows
-      my $table_rows = parse_table_rows($input_fh);
+      my $table_rows = parse_table_rows($table_name, $input_fh);
       # Print the table csv
       print_table_csv($table_name, $table_header, $table_rows);
       # Add the table to the Rails DB data structure
@@ -74,8 +74,15 @@ sub parse_copy_cmd {
 
 # Gets the table field values from the provided row
 sub parse_table_rows {
-  my $fh = pop;
+  my ($table_name, $fh) = @_;
   my $ret_rows;
+  my $debug_max_rows = 0; # 0 means parse all of them
+  # if ($table_name eq "volunteer_opportunities") {
+  #   $debug_max_rows = 1;
+  # }
+  my $debug_rows_parsed = 0;
+
+  printf("Parsing %s rows for table $table_name\n", $debug_max_rows ? $debug_max_rows : "all");
 
   # Parse the file handle until the end condition is met (in this case "\.")
   for (my $line=get_next_line($fh); $line ne '\.'; $line=get_next_line($fh)) {
@@ -84,7 +91,15 @@ sub parse_table_rows {
     #  If the value contains a comma(,) or double quote(")
     #  the entire value must be quoted after escaping the double quote(\")
     foreach $val (@values) {
+      # if (($table_name eq "volunteer_opportunities") && ($debug_rows_parsed < $debug_max_rows)) {
+      #   print "Before sanitizing:\n";
+      #   print "\t$val\n";
+      # }
       $val = sanitize_text($val);
+      # if (($table_name eq "volunteer_opportunities") && ($debug_rows_parsed < $debug_max_rows)) {
+      #   print "After:\n";
+      #   print "\t$val\n";
+      # }
       # if ($val =~ /[,"]/) {
       #   $val =~ s/"/\\"/g;
       #   $val = "\"$val\"";
@@ -97,7 +112,12 @@ sub parse_table_rows {
     #     $values[$i] = "\"$modval\"";
     #   }
     # }
-    push @$ret_rows, \@values;
+
+    # For debug purposes, only parse some of the rows
+    if (!$debug_max_rows || ($debug_rows_parsed < $debug_max_rows)) {
+      $debug_rows_parsed += 1;
+      push @$ret_rows, \@values;
+    }
   }
 
   return $ret_rows;
@@ -224,7 +244,7 @@ sub print_Pods_import {
                                 facebook_url twitter_username
                                 volunteer_types description
                                 min_duration max_duration duration_notes
-                                fee_category fee_notes
+                                cost_suggestion fees_notes
                                 other_ways_to_help contact_info);
 
   # Print the volunteer opportunities header
@@ -242,11 +262,11 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "facebook_url"),       # facebook_url
       get_field("volunteer_opportunities", $vol_opp_id, "twitter_username"),   # twitter_username
       get_field("volunteer_opportunities", $vol_opp_id, "volunteer_types"),    # volunteer_types
-      get_field("volunteer_opportunities", $vol_opp_id, "description"),  # description
+      get_field("volunteer_opportunities", $vol_opp_id, "description"),        # description
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
       get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
-      get_field("volunteer_opportunities", $vol_opp_id, "num_dollar_signs"),   # cost_suggestion
+      get_field("volunteer_opportunities", $vol_opp_id, "cost_suggestion"),    # cost_suggestion
       get_field("volunteer_opportunities", $vol_opp_id, "fees_notes"),         # fees_notes
       get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
       get_field("volunteer_opportunities", $vol_opp_id, "contact_info")  # contact_info
