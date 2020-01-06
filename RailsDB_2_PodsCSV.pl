@@ -209,6 +209,8 @@ sub print_Pods_import {
     || die "Can't open > Pods_Businesses_import.csv: $!";
   open(my $PODS_vol_opps_fh, ">", "Pods_VolunteerOpportunities.csv")
     || die "Can't open > Pods_VolunteerOpportunities.csv: $!";
+  open(my $PODS_phone_nums_fh, ">", "Pods_PhoneNumbers.csv")
+    || die "Can't open > Pods_PhoneNumbers.csv: $!";
 
   # CSV structure for Pods busineses import file
   my @Pods_businesses_header = qw(company_name locations address
@@ -274,9 +276,27 @@ sub print_Pods_import {
     print $PODS_vol_opps_fh join(",", @output_row)."\n";
   }
 
+  # CSV structure for Pods phone numbers import file
+  my @Pods_phone_nums_header = qw(phone_number phone_number_type associated_business);
+
+  # Print the volunteer opportunities header
+  print $PODS_phone_nums_fh join(",", @Pods_phone_nums_header)."\n";
+
+  # Iterate across the entries in the "phone_numbers" table and print them to the output csv
+  # Sort them so they always print out in the same order
+  foreach $phone_num_id (sort(keys(%{$RailsDB{phone_numbers}}))) {
+    my @output_row = (
+      get_field("phone_numbers", $phone_num_id, "number"),               # phone_number
+      get_field("phone_numbers", $phone_num_id, "description"),          # phone_number_type
+      get_field("phone_numbers", $phone_num_id, "associated_business")   # associated_business
+    );
+    print $PODS_phone_nums_fh join(",", @output_row)."\n";
+  }
+
   # Close the csv files
   close($PODS_businesses_fh);
   close($PODS_vol_opps_fh);
+  close($PODS_phone_nums_fh);
 }
 
 ###############################################
@@ -337,6 +357,12 @@ sub get_field {
   if ($field eq "num_dollar_signs") {
     # Only used by volunteer_opportunities, no need to pass the $table into the function
     return decode_cost_suggestion($record_id);
+  }
+
+  # The "associated_business" field used in the phone_numbers table associates a business name with the phone number
+  if ($field eq "associated_business") {
+    # Only used by phone_numbers, no need to pass the $table into the function
+    return associate_business_to_phone_number($record_id);
   }
 
   ###################
@@ -488,4 +514,19 @@ sub decode_cost_suggestion {
   }
   # Else, return a string of $'s
   return "\$" x $num_dollar_signs;
+}
+
+# associate_business_to_phone_number(<phone_num_id>)
+#   phone_num_id: Record id in the phone_numbers table
+sub associate_business_to_phone_number {
+  my ($phone_num_id) = @_;
+
+  # Sanity check, make sure the phone number is associated with a business
+  if (get_field("phone_numbers", $phone_num_id, "phone_numberable_type") ne "Business") {
+    die "Phone number id $phone_num_id is not associated with a Business\n";
+  }
+
+  # Return the name of the business assoicated with this phone number
+  my $associated_business_id = get_field("phone_numbers", $phone_num_id, "phone_numberable_id");
+  return get_field("businesses", $associated_business_id, "name");
 }
