@@ -214,7 +214,9 @@ sub print_Pods_import {
 
   # CSV structure for Pods busineses import file
   my @Pods_businesses_header = qw(company_name locations address
-                                  phone_1 phone_2 phone_3
+                                  phone_1 phone_type_1
+                                  phone_2 phone_type_2
+                                  phone_3 phone_type_3
                                   web categories description latitude longitude
                                   hours short_location);
 
@@ -228,7 +230,7 @@ sub print_Pods_import {
       get_field("businesses", $business_id, "name"),              # company_name
       get_field("businesses", $business_id, "location"),          # locations
       get_field("businesses", $business_id, "address"),     # address
-      get_field("businesses", $business_id, "phone_numbers"),     # phone_1/2/3 (returns all three)
+      get_field("businesses", $business_id, "phone_numbers"),     # phone_1/2/3 and phone_type_1/2/3 (returns all three)
       get_field("businesses", $business_id, "url"),               # web
       get_field("businesses", $business_id, "business_types"),    # categories
       get_field("businesses", $business_id, "description"), # description
@@ -446,21 +448,20 @@ sub get_phone_numbers {
   my ($business_id) = @_;
   my @ret_phone_numbers;
 
-  # Iterate over the phone_numbers table and associate a business with its phone number(s)
-  foreach $phone_numbers_id (keys(%{$RailsDB{phone_numbers}})) {
+  # Iterate over the phone_numbers table and associate a business with its phone number(s) and phone number description(s)
+  foreach $phone_numbers_id (sort(keys(%{$RailsDB{phone_numbers}}))) {
     my $phone_numbers_record = get_record("phone_numbers", $phone_numbers_id);
 
     if(($$phone_numbers_record{phone_numberable_id} == $business_id) and
     ($$phone_numbers_record{phone_numberable_type} eq "Business")) {
-      # TODO: Decide how to handle the (optional) description in Pods, not used right now
-      push @ret_phone_numbers, ($$phone_numbers_record{number});
+      push @ret_phone_numbers, ($$phone_numbers_record{number}, $$phone_numbers_record{description});
     }
   }
   
   # Return a string of three sorted comma separated values
   # Make sure to fill in the array so there are three values
-  my $fill_elms = 3 - scalar(@ret_phone_numbers);
-  return join(",", (sort(@ret_phone_numbers), ("")x$fill_elms));
+  my $fill_elms = 6 - scalar(@ret_phone_numbers);
+  return join(",", (@ret_phone_numbers, ("")x$fill_elms));
 }
 
 # get_business_types(<business_id>)
