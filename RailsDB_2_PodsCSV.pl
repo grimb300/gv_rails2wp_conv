@@ -270,7 +270,8 @@ sub print_Pods_import {
       get_field("volunteer_opportunities", $vol_opp_id, "min_duration"),       # min_duration
       get_field("volunteer_opportunities", $vol_opp_id, "max_duration"),       # max_duration
       get_field("volunteer_opportunities", $vol_opp_id, "duration_notes"),     # duration_notes
-      get_field("volunteer_opportunities", $vol_opp_id, "cost_suggestion"),    # cost_suggestion
+      # get_field("volunteer_opportunities", $vol_opp_id, "cost_suggestion"),    # cost_suggestion
+      get_field("volunteer_opportunities", $vol_opp_id, "num_dollar_signs"),    # cost_suggestion
       get_field("volunteer_opportunities", $vol_opp_id, "fees_notes"),         # fees_notes
       get_field("volunteer_opportunities", $vol_opp_id, "other_ways_to_help"), # other_ways_to_help
       get_field("volunteer_opportunities", $vol_opp_id, "contact_info")  # contact_info
